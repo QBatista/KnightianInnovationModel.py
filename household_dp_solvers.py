@@ -1,252 +1,228 @@
 """
-Implements methods for solving an household's dynamic problem.
+A module with methods for solving an household's dynamic problem.
 
 """
 
 import numpy as np
 from numba import njit, prange
 from interpolation import interp
-import torch
-import torch.nn as nn
+from collections import namedtuple
 
+
+# TODO: Add documentation, get policy function, modify convergence check to
+# also check V2_star, make `verbose` prettier
+
+results = namedtuple('results', 'success num_iter')
+
+# Note: V1 is V_bar, V2 is the intermediate value function
 
 # Value Iteration with Reiter's trick
 
-@njit()
-def solve_dp_vi(V_init, ι_vals, ζ_vals, k_tilde_vals, b_vals, δ_vals,
-                next_w, next_w_star, P_δ, P_ζ, μ, π, w_vals, wage,
-                uc_I, uc_W, β, tol=1e-8, maxiter=1000, verbose=True):
+
+@njit
+def solve_dp_vi(V1_star, V1, V2_star, V2, states_vals, δ_vals, π, β, method,
+                method_args, tol=1e-8, maxiter=1000, verbose=True):
     """
-    Solve a household's dynamic programming problem using a value iteration
-    algorithm using Michael Reiter's trick.
+    .. highlight:: none
+
+    Solves the household's DP problem using a value iteration algorithm.
+
+    This function is JIT-compiled in `nopython` mode using Numba.
+
+    Parameters
+    ----------
+    V1_star : ndarray(float, ndim=3)
+        Initial guess of the first value function to be modified inplace with
+        an approximate fixed point.
+
+    V1 : ndarray(float, ndim=3)
+        Array used to store the previous guess of the first value function.
+
+    V2_star : ndarray(float, ndim=3)
+        Initial guess of the second value function to be modified inplace with
+        an approximate fixed point.
+
+    V1 : ndarray(float, ndim=3)
+        Array used to store the previous guess of the second value function.
+
+    states_vals : tuple
+        Tuple of ndarray containing the approximation nodes for the state
+        variables in the following order: w_vals, ζ_vals, ι_vals, k_tilde_vals.
+
+    δ_vals : ndarray(float, ndim=1)
+        Array containing the possible values that δ can take.
+
+    π : scalar(float)
+        Probability of an invention being successful.
+
+    β : scalar(float)
+        Discount factor.
+
+    method : scalar(int)
+        Integer representing the method to be used for solving tmaximization
+        problems.
+        ::
+
+            0 : Brute force.
+
+    method_args : tuple
+        Tuple containing additional arguments required by the choice of
+        `method`.
+        ::
+
+            0 : P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w
+
+    tol : scalar(float), optional(default=1e-8)
+        Tolerance to be used for determining whether an approximate fixed point
+        has been found.
+
+    maxiter : scalar(int), optional(default=1000)
+        Maximum number of iterations.
+
+    verbose : bool, optional(default=True)
+        If True, prints the sup norm between the current and previous guess
+        of the value function at each iteration.
+
+    Returns
+    ----------
+    results : namedtuple
+        A namedtuple containing the following items:
+        ::
+
+            "success" : 1 if an approximate fixed point was found; 0 otherwise.
+            "num_iter" : Number of iterations performed.
 
     """
-    # Initialize value functions
-    V_bar = V_init.copy()
-    V_bar_interm = np.zeros((k_tilde_vals.size, ζ_vals.size, 2))
-    V_bar_new = V_bar.copy()
+    w_vals, ζ_vals, ι_vals, k_tilde_vals = states_vals
 
-    # Initialize policy functions
-    π_star = -np.ones((w_vals.size, ζ_vals.size, ι_vals.size, 3),
-                      dtype=np.int32)
+    success = 0
 
-    π_star_interm = np.zeros((k_tilde_vals.size, ζ_vals.size, ι_vals.size),
-                              dtype=np.int32)
-    π_star_new = π_star.copy()
+    if method == 0:  # Brute force
+        P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w = \
+            method_args
 
-    # No option to innovate
-    π_star_new[:, :, 0, 2] = 0
+        # Iterate until convergence
+        for num_iter in range(maxiter):
+            iterate_bf(V1_star, V1, V2, w_vals, ζ_vals, ι_vals, k_tilde_vals,
+                       δ_vals, π, β, P, uc, b_vals, k_tilde_av, b_av,
+                       next_w_star, next_w, tol, verbose)
 
-    # Initialize state action values
-    b_action_values = np.zeros((ζ_vals.size, k_tilde_vals.size, b_vals.size,
-                                2))
-    k_tilde_action_values = np.zeros((w_vals.size, ζ_vals.size,
-                                      k_tilde_vals.size, 2))
+            fp1 = _check_approx_fixed_point(V1_star, V1, tol, verbose)
 
-    bellman_error = np.inf
+            V1[:] = V1_star
 
-    for i in range(maxiter):
-        # Compute value function update
-        update_intermediate_V(b_action_values, V_bar_interm, V_bar_new,
-                              π_star_interm, ζ_vals, k_tilde_vals, b_vals,
-                              δ_vals, next_w, next_w_star, P_δ, P_ζ, μ, π,
-                              w_vals)
+            if fp1:  # Found approximate fixed point
+                success = 1
+                break
 
-        update_V_bar_new(k_tilde_action_values, V_bar_interm, V_bar_new,
-                         π_star_new, π_star_interm, β, w_vals, ζ_vals,
-                         k_tilde_vals, wage, uc_I, uc_W)
+    out = results(success, num_iter)
 
-        # Compute error metrics
-        bellman_error = np.max(np.abs(V_bar_new - V_bar))
-        policy_stability_metric = np.sum(π_star_new != π_star)
-
-        # Update for next iteration
-        V_bar[:] = V_bar_new
-        π_star[:] = π_star_new
-
-        b_action_values[:] = 0.
-
-        if verbose:
-            print(bellman_error, policy_stability_metric)
-
-        # Termination condition
-        if bellman_error <= tol:
-            break
-
-    return V_bar_new, π_star
+    return out
 
 
 @njit(parallel=True)
-def update_intermediate_V(b_action_values, V_bar_interm, V_bar_new,
-                          π_star_interm, ζ_vals, k_tilde_vals, b_vals, δ_vals,
-                          next_w, next_w_star, P_δ, P_ζ, μ, π, w_vals):
+def iterate_bf(V1_star, V1, V2, w_vals, ζ_vals, ι_vals, k_tilde_vals, δ_vals,
+               π, β, P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w,
+               tol, verbose):
     """
-    Update V_bar_interm once.
 
     """
-    for k_tilde_i in prange(k_tilde_vals.size):
-        for ζ_i in prange(ζ_vals.size):
+
+    update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
+                 b_vals, b_av, next_w_star, next_w, ι_vals)
+    update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2, β, k_tilde_vals, uc,
+                 k_tilde_av)
+
+
+@njit(parallel=True)
+def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
+                 b_vals, b_av, next_w_star, next_w, ι_vals):
+    """
+
+    """
+    b_av[:] = 0.
+    for ζ_i in prange(ζ_vals.size):
+        for k_tilde_i in prange(k_tilde_vals.size):
             for b_i in prange(b_vals.size):
                 for δ_i in prange(δ_vals.size):
                     for next_ζ_i in prange(ζ_vals.size):
-                        # Continuation value
-                        b_action_values[ζ_i, k_tilde_i, b_i, 0] += P_δ[δ_i] * \
-                            P_ζ[ζ_i, next_ζ_i] * (
-                            (1 - μ) * interp(w_vals, V_bar_new[:, next_ζ_i, 0],
-                                       next_w[δ_i, k_tilde_i, b_i]) +
-                            μ * interp(w_vals, V_bar_new[:, next_ζ_i, 1],
-                                       next_w[δ_i, k_tilde_i, b_i]))
+                        for ι in prange(ι_vals.size):
+                            b_av[ζ_i, k_tilde_i, b_i, 0] += \
+                                P[δ_i, ζ_i, next_ζ_i, ι] * \
+                                interp(w_vals, V1_star[ι, next_ζ_i, :],
+                                       next_w[δ_i, k_tilde_i, b_i])
 
-                        b_action_values[ζ_i, k_tilde_i, b_i, 1] += P_δ[δ_i] * \
-                            P_ζ[ζ_i, next_ζ_i] * (
-                            (1 - μ) * interp(w_vals, V_bar_new[:, next_ζ_i, 0],
-                                       next_w_star[δ_i, k_tilde_i, b_i]) +
-                            μ * interp(w_vals, V_bar_new[:, next_ζ_i, 1],
-                                       next_w_star[δ_i, k_tilde_i, b_i]))
+                            b_av[ζ_i, k_tilde_i, b_i, 1] += \
+                                P[δ_i, ζ_i, next_ζ_i, ι] * \
+                                interp(w_vals, V1_star[ι, next_ζ_i, :],
+                                       next_w_star[δ_i, k_tilde_i, b_i])
 
-                b_action_values[ζ_i, k_tilde_i, b_i, 1] = \
-                    π * b_action_values[ζ_i, k_tilde_i, b_i, 1] + \
-                    (1 - π) * b_action_values[ζ_i, k_tilde_i, b_i, 0]
 
-            # Update intermediate value and policy functions
-            π_star_interm[k_tilde_i, ζ_i, 0] = \
-                b_action_values[ζ_i, k_tilde_i, :, 0].argmax()
-            π_star_interm[k_tilde_i, ζ_i, 1] = \
-                b_action_values[ζ_i, k_tilde_i, :, 1].argmax()
+                b_av[ζ_i, k_tilde_i, b_i, 1] += \
+                    (π - 1) * (b_av[ζ_i, k_tilde_i, b_i, 1] -
+                               b_av[ζ_i, k_tilde_i, b_i, 0])
 
-            V_bar_interm[k_tilde_i, ζ_i, 0] = \
-                b_action_values[ζ_i, k_tilde_i,
-                                π_star_interm[k_tilde_i, ζ_i, 0], 0]
-            V_bar_interm[k_tilde_i, ζ_i, 1] = \
-                b_action_values[ζ_i, k_tilde_i,
-                                π_star_interm[k_tilde_i, ζ_i, 1], 1]
-
+            V2[ζ_i, k_tilde_i, 0] = b_av[ζ_i, k_tilde_i, :, 0].max()
+            V2[ζ_i, k_tilde_i, 1] = b_av[ζ_i, k_tilde_i, :, 1].max()
 
 
 @njit(parallel=True)
-def update_V_bar_new(k_tilde_action_values, V_bar_interm, V_bar_new,
-                     π_star_new, π_star_interm, β, w_vals, ζ_vals,
-                     k_tilde_vals, wage, uc_I, uc_W):
+def update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2, β, k_tilde_vals, uc,
+                 k_tilde_av):
     """
-    Update V_bar_new once.
 
     """
-    for w_i in prange(w_vals.size):
+
+    for ι in prange(ι_vals.size):
         for ζ_i in prange(ζ_vals.size):
-            for k_tilde_i in prange(k_tilde_vals.size):
-                # Work
-                k_tilde_action_values[w_i, ζ_i, k_tilde_i, 0] = \
-                    uc_W[w_i, k_tilde_i, ζ_i] + \
-                    β * V_bar_interm[k_tilde_i, ζ_i, 0]
+            for w_i in prange(w_vals.size):
+                for k_tilde_i in prange(k_tilde_vals.size):
+                    k_tilde_av[ι, ζ_i, w_i, k_tilde_i] = \
+                        uc[ι, ζ_i, w_i, k_tilde_i] + β * V2[ζ_i, k_tilde_i, ι]
 
-                # Innovate
-                k_tilde_action_values[w_i, ζ_i, k_tilde_i, 1] = \
-                    uc_I[w_i, k_tilde_i] + β * V_bar_interm[k_tilde_i, ζ_i, 1]
-
-            # Optimal k_tilde for V_W
-            π_star_new[w_i, ζ_i, 0, 0] = \
-            k_tilde_action_values[w_i, ζ_i, :, 0].argmax()
-
-            # Optimal b
-            π_star_new[w_i, ζ_i, 0, 1] = \
-            π_star_interm[π_star_new[w_i, ζ_i, 0, 0], ζ_i, 0]
-
-            # Optimal V_bar
-            V_bar_new[w_i, ζ_i, 0] = \
-            k_tilde_action_values[w_i, ζ_i, π_star_new[w_i, ζ_i, 0, 0], 0]
-
-            # Optimal k_tilde for V_I
-            π_star_new[w_i, ζ_i, 1, 0] = \
-            k_tilde_action_values[w_i, ζ_i, :, 1].argmax()
-
-            # Optimal decision to innovate conditional on opportunity
-            π_star_new[w_i, ζ_i, 1, 2] = \
-            (k_tilde_action_values[w_i, ζ_i, π_star_new[w_i, ζ_i, 1, 0], 1] >
-             k_tilde_action_values[w_i, ζ_i, π_star_new[w_i, ζ_i, 0, 0], 0])
-
-            if π_star_new[w_i, ζ_i, 1, 2]:
-                # No need to update optimal k_tilde
-                π_star_new[w_i, ζ_i, 1, 1] = \
-                π_star_interm[π_star_new[w_i, ζ_i, 1, 0], ζ_i, 1]
-                V_bar_new[w_i, ζ_i, 1] = \
-                k_tilde_action_values[w_i, ζ_i, π_star_new[w_i, ζ_i, 1, 0], 1]
-            else:
-                # Don't innovate
-                π_star_new[w_i, ζ_i, 1, 0] = π_star_new[w_i, ζ_i, 0, 0]
-                π_star_new[w_i, ζ_i, 1, 1] = \
-                π_star_interm[π_star_new[w_i, ζ_i, 0, 0], ζ_i, 0]
-                V_bar_new[w_i, ζ_i, 1] = \
-                k_tilde_action_values[w_i, ζ_i, π_star_new[w_i, ζ_i, 0, 0], 0]
+    for ζ_i in prange(ζ_vals.size):
+        for w_i in prange(w_vals.size):
+            V1_star[0, ζ_i, w_i] = k_tilde_av[0, ζ_i, w_i, :].max()
+            V1_star[1, ζ_i, w_i] = max(V1_star[0, ζ_i, w_i],
+                                       k_tilde_av[1, ζ_i, w_i, :].max())
 
 
-# Semi-Gradient Descent with a Neural Network
-
-class NeuralNet(nn.Module):
-    def __init__(self, input_size, size_hidden_layers, num_classes):
-        super(NeuralNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, size_hidden_layers)
-        self.act1 = nn.Sigmoid()
-        self.fc2 = nn.Linear(size_hidden_layers, size_hidden_layers)
-        self.act2 = nn.Sigmoid()
-        self.fc3 = nn.Linear(size_hidden_layers, num_classes)
-
-    def forward(self, x):
-        out = self.fc1(x)
-        out = self.act1(out)
-        out = self.fc2(out)
-        out = self.act2(out)
-        out = self.fc3(out)
-        return out
-
-
-def solve_dp_sgd_nn(uc_W, uc_I, P, β, α, ι_vals, δ_vals, ζ_vals, k_tilde_vals,
-                    b_vals, states, next_states, next_states_star,
-                    size_hidden_layers, device, tol=1e-6):
+@njit
+def _check_approx_fixed_point(V_current, V_previous, tol, verbose):
     """
-    Solve a household's dynamic programming problem using a semi-gradient
-    descent algorithm with a neural network to approximate the value function.
+    Checks whether the value iteration algorithm has reached an approximate
+    fixed point using the sup norm.
+
+    Parameters
+    ----------
+    V_current : ndarray(float)
+        Most recent approximation of the value function.
+
+    V_previous : ndarray(float)
+        Approximation of the value function from the previous iteration of
+        the algorithm.
+
+    tol : scalar(float)
+        Tolerance to be used for determining whether an approximate fixed point
+        has been found.
+
+    verbose : bool
+        If True, the sup norm of `V_current` and `V_previous` is printed.
+
+    Returns
+    -------
+    fp : bool
+        Whether `V_current` is an approximate fixed point.
 
     """
-    nb_states = 3
 
-    V = NeuralNet(nb_states, size_hidden_layers, 1)
+    # Compute the sup norm between `V_current` and `V_previous`
+    sup_norm = np.max(np.abs(V_current - V_previous))
 
-    V.to(device)
+    if verbose:
+        print(sup_norm)
 
-    criterion = nn.MSELoss()
-    optimizer_V = torch.optim.Adam(V.parameters(), lr=α)
+    # Algorithm termination condition
+    fp = sup_norm <= tol
 
-    while True:
-        # Zero the gradients
-        optimizer_V.zero_grad()
-
-        # Compute action values
-        Q_W = uc_W + β * (P *
-        V(next_states).view(ι_vals.size * δ_vals.size * ζ_vals.size,
-                            k_tilde_vals.size * b_vals.size)).sum(0, keepdim=True)
-        Q_I = uc_I + β * (P *
-        V(next_states_star).view(ι_vals.size * δ_vals.size * ζ_vals.size,
-                                 k_tilde_vals.size * b_vals.size)).sum(0, keepdim=True)
-
-        Q_I = π * Q_W + (1 - π) * Q_I
-
-        # Compute gradient descent target
-        V_W = torch.max(Q_W, 1, keepdim=True)[0]
-        V_I = torch.max(Q_I, 1, keepdim=True)[0]
-
-        target = torch.cat([V_W, torch.max(V_W, V_I)])
-
-        # Evaluate current approximation at the states of interest
-        value_estimates = V(states)
-
-        # Compute the update
-        loss = criterion(value_estimates, target.detach())
-
-        loss.backward()
-        optimizer_V.step()
-
-        print(loss.item())
-        if loss.mean().item() < tol:
-            break
-
-    return V
+    return fp
