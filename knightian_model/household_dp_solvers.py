@@ -20,8 +20,8 @@ results = namedtuple('results', 'success num_iter')
 
 
 @njit
-def solve_dp_vi(V1_star, V1, V2_star, V2, states_vals, δ_vals, π, β, method,
-                method_args, tol=1e-8, maxiter=1000, verbose=True):
+def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
+                β, method, method_args, tol=1e-8, maxiter=1000, verbose=True):
     """
     .. highlight:: none
 
@@ -35,14 +35,14 @@ def solve_dp_vi(V1_star, V1, V2_star, V2, states_vals, δ_vals, π, β, method,
         Initial guess of the first value function to be modified inplace with
         an approximate fixed point.
 
-    V1 : ndarray(float, ndim=3)
+    V1_store : ndarray(float, ndim=3)
         Array used to store the previous guess of the first value function.
 
     V2_star : ndarray(float, ndim=3)
         Initial guess of the second value function to be modified inplace with
         an approximate fixed point.
 
-    V1 : ndarray(float, ndim=3)
+    V2_store : ndarray(float, ndim=3)
         Array used to store the previous guess of the second value function.
 
     states_vals : tuple
@@ -103,11 +103,11 @@ def solve_dp_vi(V1_star, V1, V2_star, V2, states_vals, δ_vals, π, β, method,
 
         # Iterate until convergence
         for num_iter in range(maxiter):
-            iterate_bf(V1_star, V1, V2, w_vals, ζ_vals, ι_vals, k_tilde_vals,
-                       δ_vals, π, β, P, uc, b_vals, k_tilde_av, b_av,
-                       next_w_star, next_w, tol, verbose)
+            iterate_bf(V1_star, V2_star, w_vals, ζ_vals, ι_vals,
+                       k_tilde_vals, δ_vals, π, β, P, uc, b_vals, k_tilde_av,
+                       b_av, next_w_star, next_w, tol, verbose)
 
-            fp1 = _check_approx_fixed_point(V1_star, V1, tol, verbose)
+            fp1 = _check_approx_fixed_point(V1_star, V1_store, tol, verbose)
 
             V1[:] = V1_star
 
@@ -121,7 +121,7 @@ def solve_dp_vi(V1_star, V1, V2_star, V2, states_vals, δ_vals, π, β, method,
 
 
 @njit(parallel=True)
-def iterate_bf(V1_star, V1, V2, w_vals, ζ_vals, ι_vals, k_tilde_vals, δ_vals,
+def iterate_bf(V1_star, V2_star, w_vals, ζ_vals, ι_vals, k_tilde_vals, δ_vals,
                π, β, P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w,
                tol, verbose):
     """

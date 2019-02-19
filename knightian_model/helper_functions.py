@@ -8,28 +8,60 @@ from numba import njit, prange
 from interpolation import interp
 
 
-# TODO: Finish documentation
-
 def initialize_values_and_policies(states_vals, b_vals):
     """
     Initializes arrays representing the value and policy functions.
+
+    Parameters
+    ----------
+    states_vals : tuple
+        Tuple of ndarray containing the approximation nodes for the state
+        variables in the following order: w_vals, ζ_vals, ι_vals, k_tilde_vals.
+
+    b_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for the borrowing choice
+        variable.
+
+    Returns
+    ----------
+    V1_star : ndarray(float, ndim=3)
+        Initial guess of the first value function to be modified inplace with
+        an approximate fixed point.
+
+    V1_store : ndarray(float, ndim=3)
+        Array used to store the previous guess of the first value function.
+
+    V2_star : ndarray(float, ndim=3)
+        Initial guess of the second value function to be modified inplace with
+        an approximate fixed point.
+
+    V2_store : ndarray(float, ndim=3)
+        Array used to store the previous guess of the second value function.
+
+    b_av : ndarray(float, ndim=4)
+        Array used to store the action values of the different borrowing
+        levels at the approximation nodes `b_vals`.
+
+    k_tilde_av : ndarray(float, ndim=4)
+        Array used to store the action values of the different net investment
+        levels at the approximation nodes `k_tilde_vals`.
 
     """
     w_vals, ζ_vals, ι_vals, k_tilde_vals = states_vals
 
     # Initialize value functions
     V2_star = np.zeros((ζ_vals.size, k_tilde_vals.size, ι_vals.size))
-    V2 = np.zeros_like(V2_star)
+    V2_store = np.zeros_like(V2_star)
 
     V1_star = np.zeros((ι_vals.size, ζ_vals.size, w_vals.size))
-    V1 = np.zeros_like(V1_star)
+    V1_store = np.zeros_like(V1_star)
 
     # Initialize state action values
     b_av = np.zeros((ζ_vals.size, k_tilde_vals.size, b_vals.size, ι_vals.size))
     k_tilde_av = np.zeros((ι_vals.size, ζ_vals.size, w_vals.size,
                            k_tilde_vals.size))
 
-    return V1_star, V1, V2_star, V2, b_av, k_tilde_av
+    return V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av
 
 
 def create_uc_grid(u, states_vals, wage, min_c=1e-20):
