@@ -9,8 +9,10 @@ from interpolation import interp
 from collections import namedtuple
 
 
-# TODO: Add documentation, get policy function, modify convergence check to
-# also check V2_star, make `verbose` prettier
+# TODO:
+# - modify convergence check to check V2_star and
+# - make tolerance level of error
+# - make `verbose` prettier
 
 results = namedtuple('results', 'success num_iter')
 
@@ -63,7 +65,7 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
         problems.
         ::
 
-            0 : Brute force.
+            0 : Grid search.
 
     method_args : tuple
         Tuple containing additional arguments required by the choice of
@@ -93,6 +95,7 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
             "num_iter" : Number of iterations performed.
 
     """
+
     w_vals, ζ_vals, ι_vals, k_tilde_vals = states_vals
 
     success = 0
@@ -103,10 +106,11 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
 
         # Iterate until convergence
         for num_iter in range(maxiter):
-            update_V2_bf(ζ_vals, k_tilde_vals, V2_star, δ_vals, P, w_vals,
-                         V1_star, π, b_vals, b_av, next_w_star, next_w, ι_vals)
-            update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2_star, β,
-                         k_tilde_vals, uc, k_tilde_av)
+            bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2_star, δ_vals, P, w_vals,
+                             V1_star, π, b_vals, b_av, next_w_star, next_w,
+                             ι_vals)
+            bellman_op_V1_gs(ι_vals, ζ_vals, w_vals, V1_star, V2_star, β,
+                             k_tilde_vals, uc, k_tilde_av)
 
             fp1 = _check_approx_fixed_point(V1_star, V1_store, tol, verbose)
 
@@ -123,11 +127,64 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
 
 
 @njit(parallel=True)
-def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1,  π,
-                 b_vals, b_av, next_w_star, next_w, ι_vals):
+def bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1, π,
+                     b_vals, b_av, next_w_star, next_w, ι_vals):
     """
+    Bellman operator for the second value function using grid search
+    maximization.
+
+    Parameters
+    ----------
+    ζ_vals : ndarray(float, ndim=1)
+        Grid for the labor income shock variable ζ.
+
+    k_tilde_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for both the state and
+        choice net investment variable k_tilde.
+
+    V2 : ndarray(float, ndim=3)
+        Array of shape `(ζ_vals.size, k_tilde_vals.size, ι_vals.size)`
+        containing estimates of the second value function.
+
+    δ_vals : ndarray(float, ndim=1)
+        Array containing the possible values that δ can take.
+
+    P : ndarray(float, ndim=3)
+        Joint probability distribution over the values of δ, ζ and ι.
+        Probabilities vary by δ on the first axis, by ζ on the second axis,
+        and by ι on the third axis.
+
+    w_vals : ndarray(float, ndim=1)
+        Grid for the wealth variable w.
+
+    V1 : ndarray(float, ndim=3)
+        Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size)` to be modified
+        inplace with the result of applying the bellman operator.
+
+    π : scalar(float)
+        Probability of an invention being successful.
+
+    b_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for the borrowing choice
+        variable.
+
+    b_av : ndarray(float, ndim=4)
+        Array used to store the action values of the different borrowing
+        levels at the approximation nodes `b_vals`.
+
+    next_w_star : ndarray(float, ndim=3)
+        Array containing the next period wealth values implied by the
+        parameters when an invention is succesful.
+
+    next_w : ndarray(float, ndim=3)
+        Array containing the next period wealth values implied by the
+        parameters without a succesful invention.
+
+    ι_vals : ndarray(float, ndim=1)
+        Array containing the different values of ι.
 
     """
+
     b_av[:] = 0.
     for ζ_i in prange(ζ_vals.size):
         for k_tilde_i in prange(k_tilde_vals.size):
@@ -145,7 +202,6 @@ def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1,  π,
                                 interp(w_vals, V1[ι, next_ζ_i, :],
                                        next_w_star[δ_i, k_tilde_i, b_i])
 
-
                 b_av[ζ_i, k_tilde_i, b_i, 1] += \
                     (π - 1) * (b_av[ζ_i, k_tilde_i, b_i, 1] -
                                b_av[ζ_i, k_tilde_i, b_i, 0])
@@ -155,9 +211,47 @@ def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1,  π,
 
 
 @njit(parallel=True)
-def update_V1_bf(ι_vals, ζ_vals, w_vals, V1, V2, β, k_tilde_vals, uc,
-                 k_tilde_av):
+def bellman_op_V1_gs(ι_vals, ζ_vals, w_vals, V1, V2, β, k_tilde_vals, uc,
+                     k_tilde_av):
     """
+    Bellman operator for the first value function using grid search
+    maximization.
+
+    Parameters
+    ----------
+    ι_vals : ndarray(float, ndim=1)
+        Array containing the different values of ι.
+
+    ζ_vals : ndarray(float, ndim=1)
+        Grid for the labor income shock variable ζ.
+
+    w_vals : ndarray(float, ndim=1)
+        Grid for the wealth variable w.
+
+    V1 : ndarray(float, ndim=3)
+        Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size)` to be modified
+        inplace with the result of applying the bellman operator.
+
+    V2 : ndarray(float, ndim=3)
+        Array of shape `(ζ_vals.size, k_tilde_vals.size, ι_vals.size)`
+        containing estimates of the second value function.
+
+    β : scalar(float)
+        Discount factor.
+
+    k_tilde_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for both the state and
+        choice net investment variable k_tilde.
+
+    uc : ndarray(float, ndim=4)
+        Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size,
+        k_tilde_vals.size)` containing utility function evaluations.
+
+    k_tilde_av : ndarray(float, ndim=4)
+        Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size,
+        k_tilde_vals.size)` used to be modified inplace with the action values
+        of the different net investment levels at the approximation nodes
+        `k_tilde_vals`.
 
     """
 
@@ -172,7 +266,7 @@ def update_V1_bf(ι_vals, ζ_vals, w_vals, V1, V2, β, k_tilde_vals, uc,
         for w_i in prange(w_vals.size):
             V1[0, ζ_i, w_i] = k_tilde_av[0, ζ_i, w_i, :].max()
             V1[1, ζ_i, w_i] = max(V1[0, ζ_i, w_i],
-                                       k_tilde_av[1, ζ_i, w_i, :].max())
+                                  k_tilde_av[1, ζ_i, w_i, :].max())
 
 
 @njit

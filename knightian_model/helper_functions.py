@@ -6,21 +6,49 @@ Helper routines for solving the Knightian model.
 import numpy as np
 from numba import njit, prange
 from interpolation import interp
-import quantecon as qe
 
 
 @njit
-def compute_policy_grid(π_star, V_star, b_av, b_vals, k_tilde_av,
+def compute_policy_grid(π_star, V1_star, b_av, b_vals, k_tilde_av,
                         k_tilde_vals):
     """
+    Compute the optimal policy function on a grid of state values.
+
+    Parameters
+    ----------
+    π_star : ndarray(float, ndim=4)
+        Array to be modified inplace with the optimal policy estimates. The
+        choice variables are in the last dimension in the following order
+        `ι_D, k_tilde, b`.
+
+    V1_star : ndarray(float, ndim=3)
+        Array containing estimates of the optimal value function.
+
+    b_av : ndarray(float, ndim=4)
+        Array containing estimates of the action values of the different
+        borrowing levels at the approximation nodes `b_vals`.
+
+    b_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for the borrowing choice
+        variable.
+
+    k_tilde_av : ndarray(float, ndim=4)
+        Array containing the estimates of the action values for different net
+        investment levels at the approximation nodes `k_tilde_vals`.
+
+    k_tilde_vals : ndarray(float, ndim=1)
+        Array containing the approximation nodes for both the state and
+        choice net investment variable k_tilde.
+
     """
+
     # Work or invent
     π_star[0, :, :, 0] = 0.
     π_star[1, :, :, 0] = V_star[1, :, :] > V_star[0, :, :]
 
-    for ι in range(V_star.shape[0]):
-        for ζ_i in range(V_star.shape[1]):
-            for w_i in range(V_star.shape[2]):
+    for ι in range(V1_star.shape[0]):
+        for ζ_i in range(V1_star.shape[1]):
+            for w_i in range(V1_star.shape[2]):
                 # k_tilde
                 opt_k_tilde_av_idx = k_tilde_av[int(π_star[ι, ζ_i, w_i, 0]),
                                                 ζ_i, w_i, :].argmax()
@@ -43,7 +71,7 @@ def initialize_values_and_policies(states_vals, b_vals):
 
     b_vals : ndarray(float, ndim=1)
         Array containing the approximation nodes for the borrowing choice
-        variable.
+        variable b.
 
     Returns
     ----------
@@ -70,6 +98,7 @@ def initialize_values_and_policies(states_vals, b_vals):
         levels at the approximation nodes `k_tilde_vals`.
 
     """
+
     w_vals, ζ_vals, ι_vals, k_tilde_vals = states_vals
 
     # Initialize value functions
@@ -114,7 +143,8 @@ def create_uc_grid(u, states_vals, wage, min_c=1e-20):
     Returns
     ----------
     uc : ndarray(float, ndim=4)
-        Array containing the utility function evaluations.
+        Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size,
+        k_tilde_vals.size)` containing utility function evaluations.
 
     """
 
