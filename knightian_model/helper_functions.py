@@ -6,6 +6,29 @@ Helper routines for solving the Knightian model.
 import numpy as np
 from numba import njit, prange
 from interpolation import interp
+import quantecon as qe
+
+
+@njit
+def compute_policy_grid(π_star, V_star, b_av, b_vals, k_tilde_av,
+                        k_tilde_vals):
+    """
+    """
+    # Work or invent
+    π_star[0, :, :, 0] = 0.
+    π_star[1, :, :, 0] = V_star[1, :, :] > V_star[0, :, :]
+
+    for ι in range(V_star.shape[0]):
+        for ζ_i in range(V_star.shape[1]):
+            for w_i in range(V_star.shape[2]):
+                # k_tilde
+                opt_k_tilde_av_idx = k_tilde_av[int(π_star[ι, ζ_i, w_i, 0]),
+                                                ζ_i, w_i, :].argmax()
+                π_star[ι, ζ_i, w_i, 1] = k_tilde_vals[opt_k_tilde_av_idx]
+
+                # b
+                opt_b_av_idx = b_av[ζ_i, opt_k_tilde_av_idx, :, ι].argmax()
+                π_star[ι, ζ_i, w_i, 2] = b_vals[opt_b_av_idx]
 
 
 def initialize_values_and_policies(states_vals, b_vals):
@@ -61,7 +84,10 @@ def initialize_values_and_policies(states_vals, b_vals):
     k_tilde_av = np.zeros((ι_vals.size, ζ_vals.size, w_vals.size,
                            k_tilde_vals.size))
 
-    return V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av
+    # Initialize policy function
+    π_star = np.zeros((ι_vals.size, ζ_vals.size, w_vals.size, 3))
+
+    return V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star
 
 
 def create_uc_grid(u, states_vals, wage, min_c=1e-20):
@@ -180,3 +206,5 @@ def create_P(P_δ, P_ζ, P_ι):
         P_ι[None, None, None, :]
 
     return P
+
+

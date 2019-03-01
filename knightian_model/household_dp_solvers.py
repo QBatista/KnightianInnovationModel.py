@@ -103,13 +103,15 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
 
         # Iterate until convergence
         for num_iter in range(maxiter):
-            iterate_bf(V1_star, V2_star, w_vals, ζ_vals, ι_vals,
-                       k_tilde_vals, δ_vals, π, β, P, uc, b_vals, k_tilde_av,
-                       b_av, next_w_star, next_w, tol, verbose)
+            update_V2_bf(ζ_vals, k_tilde_vals, V2_star, δ_vals, P, w_vals,
+                         V1_star, π, b_vals, b_av, next_w_star, next_w, ι_vals)
+            update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2_star, β,
+                         k_tilde_vals, uc, k_tilde_av)
 
             fp1 = _check_approx_fixed_point(V1_star, V1_store, tol, verbose)
 
-            V1[:] = V1_star
+            V1_store[:] = V1_star
+            V2_store[:] = V2_star
 
             if fp1:  # Found approximate fixed point
                 success = 1
@@ -121,21 +123,7 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
 
 
 @njit(parallel=True)
-def iterate_bf(V1_star, V2_star, w_vals, ζ_vals, ι_vals, k_tilde_vals, δ_vals,
-               π, β, P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w,
-               tol, verbose):
-    """
-
-    """
-
-    update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
-                 b_vals, b_av, next_w_star, next_w, ι_vals)
-    update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2, β, k_tilde_vals, uc,
-                 k_tilde_av)
-
-
-@njit(parallel=True)
-def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
+def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1,  π,
                  b_vals, b_av, next_w_star, next_w, ι_vals):
     """
 
@@ -149,12 +137,12 @@ def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
                         for ι in prange(ι_vals.size):
                             b_av[ζ_i, k_tilde_i, b_i, 0] += \
                                 P[δ_i, ζ_i, next_ζ_i, ι] * \
-                                interp(w_vals, V1_star[ι, next_ζ_i, :],
+                                interp(w_vals, V1[ι, next_ζ_i, :],
                                        next_w[δ_i, k_tilde_i, b_i])
 
                             b_av[ζ_i, k_tilde_i, b_i, 1] += \
                                 P[δ_i, ζ_i, next_ζ_i, ι] * \
-                                interp(w_vals, V1_star[ι, next_ζ_i, :],
+                                interp(w_vals, V1[ι, next_ζ_i, :],
                                        next_w_star[δ_i, k_tilde_i, b_i])
 
 
@@ -167,7 +155,7 @@ def update_V2_bf(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1_star,  π,
 
 
 @njit(parallel=True)
-def update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2, β, k_tilde_vals, uc,
+def update_V1_bf(ι_vals, ζ_vals, w_vals, V1, V2, β, k_tilde_vals, uc,
                  k_tilde_av):
     """
 
@@ -182,8 +170,8 @@ def update_V1_bf(ι_vals, ζ_vals, w_vals, V1_star, V2, β, k_tilde_vals, uc,
 
     for ζ_i in prange(ζ_vals.size):
         for w_i in prange(w_vals.size):
-            V1_star[0, ζ_i, w_i] = k_tilde_av[0, ζ_i, w_i, :].max()
-            V1_star[1, ζ_i, w_i] = max(V1_star[0, ζ_i, w_i],
+            V1[0, ζ_i, w_i] = k_tilde_av[0, ζ_i, w_i, :].max()
+            V1[1, ζ_i, w_i] = max(V1[0, ζ_i, w_i],
                                        k_tilde_av[1, ζ_i, w_i, :].max())
 
 

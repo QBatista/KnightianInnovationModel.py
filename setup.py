@@ -18,6 +18,7 @@ setup(name='knightian_model',
       install_requires=[
           'numba>=0.38',
           'numpy',
+          'quantecon',
           'interpolation',
           ]
       )

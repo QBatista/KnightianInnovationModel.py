@@ -96,7 +96,7 @@ def test_solve_dp_vi():
     next_w, next_w_star = create_next_w(r, δ_vals, k_tilde_vals, b_vals, R,
                                         Γ_star)
 
-    V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av = \
+    V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star = \
         initialize_values_and_policies(states_vals, b_vals)
 
     P = create_P(P_δ, P_ζ, P_ι)
