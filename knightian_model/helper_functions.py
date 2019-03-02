@@ -200,7 +200,7 @@ def create_next_w(r, δ_vals, k_tilde_vals, b_vals, R, Γ_star):
     """
 
     next_w = (1 + r) * δ_vals[:, None, None] * k_tilde_vals[None, :, None] + \
-     (R - (1 + r) * δ_vals[:, None, None]) * b_vals[None, None, :]
+        (R - (1 + r) * δ_vals[:, None, None]) * b_vals[None, None, :]
     next_w_star = next_w + Γ_star
 
     return next_w, next_w_star
@@ -236,5 +236,3 @@ def create_P(P_δ, P_ζ, P_ι):
         P_ι[None, None, None, :]
 
     return P
-
-
