@@ -149,6 +149,7 @@ def test_solve_dp_vi():
     """
     Tests if the function `solve_dp_vi` successfully converges to an
     approximate fixed point without checking its output.
+
     """
 
     # Parameters

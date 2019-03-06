@@ -10,7 +10,7 @@ from collections import namedtuple
 
 
 # TODO:
-# - modify convergence check to check V2_star and
+# - modify convergence check to check V2_star
 # - make tolerance level of error
 # - make `verbose` prettier
 
@@ -52,13 +52,13 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
         variables in the following order: w_vals, ζ_vals, ι_vals, k_tilde_vals.
 
     δ_vals : ndarray(float, ndim=1)
-        Array containing the possible values that δ can take.
+        Grid for the depreciation rate variable δ.
 
     π : scalar(float)
         Probability of an invention being successful.
 
     β : scalar(float)
-        Discount factor.
+        Discount factor. Must be strictly less than 1.
 
     method : scalar(int)
         Integer representing the method to be used for solving tmaximization
@@ -155,7 +155,8 @@ def bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1, π,
         and by ι on the third axis.
 
     w_vals : ndarray(float, ndim=1)
-        Grid for the wealth variable w.
+        Array containing the approximation nodes for the wealth state variable
+        w.
 
     V1 : ndarray(float, ndim=3)
         Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size)` to be modified
@@ -181,7 +182,7 @@ def bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1, π,
         parameters without a succesful invention.
 
     ι_vals : ndarray(float, ndim=1)
-        Array containing the different values of ι.
+        Grid for the invention opportunity variable ι.
 
     """
 
@@ -220,13 +221,14 @@ def bellman_op_V1_gs(ι_vals, ζ_vals, w_vals, V1, V2, β, k_tilde_vals, uc,
     Parameters
     ----------
     ι_vals : ndarray(float, ndim=1)
-        Array containing the different values of ι.
+        Grid for the invention opportunity variable ι.
 
     ζ_vals : ndarray(float, ndim=1)
         Grid for the labor income shock variable ζ.
 
     w_vals : ndarray(float, ndim=1)
-        Grid for the wealth variable w.
+        Array containing the approximation nodes for the wealth state variable
+        w.
 
     V1 : ndarray(float, ndim=3)
         Array of shape `(ι_vals.size, ζ_vals.size, w_vals.size)` to be modified

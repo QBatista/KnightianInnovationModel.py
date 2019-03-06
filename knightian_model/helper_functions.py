@@ -7,6 +7,8 @@ import numpy as np
 from numba import njit, prange
 from interpolation import interp
 
+# TODO: Add a method to compute j_bar and Γ_star
+
 
 @njit
 def compute_policy_grid(π_star, V1_star, b_av, b_vals, k_tilde_av,
@@ -22,7 +24,7 @@ def compute_policy_grid(π_star, V1_star, b_av, b_vals, k_tilde_av,
         `ι_D, k_tilde, b`.
 
     V1_star : ndarray(float, ndim=3)
-        Array containing estimates of the optimal value function.
+        Array containing estimates of the first optimal value function.
 
     b_av : ndarray(float, ndim=4)
         Array containing estimates of the action values of the different
@@ -44,7 +46,7 @@ def compute_policy_grid(π_star, V1_star, b_av, b_vals, k_tilde_av,
 
     # Work or invent
     π_star[0, :, :, 0] = 0.
-    π_star[1, :, :, 0] = V_star[1, :, :] > V_star[0, :, :]
+    π_star[1, :, :, 0] = V1_star[1, :, :] > V1_star[0, :, :]
 
     for ι in range(V1_star.shape[0]):
         for ζ_i in range(V1_star.shape[1]):
@@ -173,7 +175,7 @@ def create_next_w(r, δ_vals, k_tilde_vals, b_vals, R, Γ_star):
         Rate of return on the risky asset.
 
     δ_vals : ndarray(float, ndim=1)
-        Possible values of δ.
+        Grid for the depreciation rate variable δ.
 
     k_tilde_vals : ndarray(float, ndim=1)
         Approximation nodes for k_tilde.
@@ -216,8 +218,8 @@ def create_P(P_δ, P_ζ, P_ι):
     P_δ : ndarray(float, ndim=1)
         Probability distribution over the values of δ.
 
-    P_ζ : ndarray(float, ndim=1)
-        Probability distribution over the values of ζ.
+    P_ζ : ndarray(float, ndim=2)
+        Markov transition matrix for ζ.
 
     P_ι : ndarray(float, ndim=1)
         Probability distribution over the values of ι.

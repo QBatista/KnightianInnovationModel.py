@@ -47,13 +47,13 @@ def production_function_factory(A, σ_1, σ_2):
     Parameters
     ----------
     A : scalar(float)
-        Scale of production parameter
+        Scale of production parameter.
 
     σ_1 : scalar(float)
-        Capital share of production
+        Capital share of production.
 
     σ_2 : scalar(float)
-        Labor share of production
+        Labor share of production.
 
     Returns
     ----------

@@ -25,4 +25,4 @@ pip install -e /path/to/package
 
 ### Tests
 
-Tests must be run locally. To run tests, navigate to your local copy of this repository and run `pytest`.
+To run tests, navigate to your local copy of this repository and run `pytest`.
