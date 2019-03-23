@@ -90,25 +90,24 @@ class KIMHouseholds():
             raise ValueError('The dimensions of `δ_vals` and `P_δ` do not ' +
                              'match. Please change the values appropriately.')
 
-        if (P_δ < 0. or P_δ > 1.).any() or P_δ.sum() != 1.:
+        if (P_δ < 0.).any() or (P_δ > 1.).any() or P_δ.sum() != 1.:
             raise ValueError('The new value of P_δ is not a valid ' +
                              'probability distribution.')
 
-        if ζ_vals.size != P_ζ.size:
+        if ζ_vals.size != P_ζ.shape[0]:
             raise ValueError('The dimensions of `ζ_vals` and `P_ζ` do not ' +
                              'match. Please change the values appropriately.')
 
-        if (P_ζ < 0. or P_ζ > 1.).any() or P_ζ.sum() != 1.:
-            raise ValueError('The new value of P_ζ is not a valid ' +
-                             'probability distribution.')
+        if P_ζ.shape[0] != P_ζ.shape[1]:
+            raise ValueError('P_ζ must be a square matrix')
 
         self._check_invalid_π(π)
 
         # Initialize parameters
 
         self._α = α
-        self._u = utility_function_factory(self.ν)  # Checks that ν is valid
         self._ν = ν
+        self._u = utility_function_factory(self.ν)  # Checks that ν is valid
         self._β = β
         self._δ_vals = δ_vals
         self._P_δ = P_δ
@@ -508,9 +507,9 @@ class KnightianInnovationModel():
 
         self._compute_params()
 
-        (self.V1_star, self.V1_store, self.V2_star, self.V2_store, self.b_av,
-         self.k_tilde_av, self.π_star) = \
-            initialize_values_and_policies(self.states_vals,
+        (self._V1_star, self._V1_store, self._V2_star, self._V2_store, self._b_av,
+         self._k_tilde_av, self._π_star) = \
+            initialize_values_and_policies(self._states_vals,
                                            self.hh.b_vals)
 
     def __repr__(self):
@@ -597,6 +596,14 @@ class KnightianInnovationModel():
         return self._p_M
 
     @property
+    def Γ_star(self):
+        return self._Γ_star
+
+    @property
+    def j_bar(self):
+        return self._j_bar
+
+    @property
     def V1_star(self):
         return self._V1_star
 
@@ -624,7 +631,7 @@ class KnightianInnovationModel():
 
         # Compute `j_bar` and `Γ_star`
         self._j_bar = np.floor(np.log(self.R / self.p_M) / np.log(self.γ))
-        js = _np.arange(0, self.j_bar + 1)
+        js = np.arange(0, self._j_bar + 1)
         self._Γ_star = ((self.γ ** js * self.p_M / self.R - 1) / \
             self.R ** (-js)).sum()
 
@@ -680,20 +687,20 @@ class KnightianInnovationModel():
 
     def solve_household_DP_problem(self, method=0, tol=1e-7):
         if method == 0:
-            uc = create_uc_grid(self.hh.u, self.states_vals, self.wage)
+            uc = create_uc_grid(self.hh.u, self._states_vals, self.wage)
 
             method_args = \
-                (self.hh.P, uc, self.hh.b_vals, self.k_tilde_av, self.b_av,
-                 self.hh.next_w_star, self.hh.next_w)
+                (self.hh.P, uc, self.hh.b_vals, self._k_tilde_av, self.b_av,
+                 self.hh._next_w_star, self.hh._next_w)
 
-            results = solve_dp_vi(self.V1_star, self.V1_store, self.V2_star,
-                                  self.V2_store, self.states_vals,
+            results = solve_dp_vi(self._V1_star, self._V1_store, self.V2_star,
+                                  self._V2_store, self._states_vals,
                                   self.hh.δ_vals,
                                   self.hh.π, self.hh.β, method, method_args,
                                   tol=tol)
 
-            compute_policy_grid(self.π_star, self.V1_star, self.b_av,
-                                self.hh.b_vals, self.k_tilde_av,
+            compute_policy_grid(self._π_star, self._V1_star, self._b_av,
+                                self.hh.b_vals, self._k_tilde_av,
                                 self.hh.k_tilde_vals)
 
     def plot_value_functions(self, markersize=1.5):

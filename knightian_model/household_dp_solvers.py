@@ -201,7 +201,7 @@ def bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2, δ_vals, P, w_vals, V1, π,
                             b_av[ζ_i, k_tilde_i, b_i, 1] += \
                                 P[δ_i, ζ_i, next_ζ_i, ι] * \
                                 interp(w_vals, V1[ι, next_ζ_i, :],
-                                       next_w_star[δ_i, k_tilde_i, b_i])
+                                       next_w_star[δ_i, k_tilde_i, b_i],)
 
                 b_av[ζ_i, k_tilde_i, b_i, 1] += \
                     (π - 1) * (b_av[ζ_i, k_tilde_i, b_i, 1] -
