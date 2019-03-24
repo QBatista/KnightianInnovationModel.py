@@ -632,7 +632,7 @@ class KnightianInnovationModel():
         # Compute `j_bar` and `Γ_star`
         self._j_bar = np.floor(np.log(self.R / self.p_M) / np.log(self.γ))
         js = np.arange(0, self._j_bar + 1)
-        self._Γ_star = ((self.γ ** js * self.p_M / self.R - 1) / \
+        self._Γ_star = ((self.γ ** js * self.p_M / self.R - 1) * \
             self.R ** (-js)).sum()
 
         # Compute states
