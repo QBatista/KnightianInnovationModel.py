@@ -14,7 +14,7 @@ import warnings
 
 
 # TODO:
-# - Add tests
+# - Finish adding tests
 
 class KIMHouseholds():
     """
@@ -45,6 +45,9 @@ class KIMHouseholds():
 
     π : scalar(float), optional(default=1.)
         Probability of an invention being successful.
+
+    μ : scalar(float), optional(default=0.5)
+        Arrival rate of invention opportunities.
 
     w_vals : ndarray(float, ndim=1), optional(default=None)
         Array containing the approximation nodes for the wealth state variable
@@ -79,8 +82,8 @@ class KIMHouseholds():
 
     def __init__(self, α=1., ν=2., β=0.9, δ_vals=np.array([0.9, 0.95]),
                  P_δ=np.array([0.5, 0.5]), ζ_vals=np.array([1., 5.]),
-                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=1., w_vals=None,
-                 b_vals=None, k_tilde_vals=None):
+                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=1., μ=0.5,
+                 w_vals=None,  b_vals=None, k_tilde_vals=None):
 
         # Parameters check
         self._check_invalid_α(α)
@@ -115,7 +118,7 @@ class KIMHouseholds():
         self._P_ζ = P_ζ
         self._ι_vals = np.array([0, 1])
         self._π = π
-        self._P_ι = np.array([1 - π, π])
+        self._P_ι = np.array([1 - μ, μ])
 
         if w_vals is None:
             self._w_vals = np.linspace(1e-8, 50., 2**9)
@@ -254,7 +257,6 @@ class KIMHouseholds():
 
         _check_invalid_π(new_value)
         self._π = value
-        self._P = create_P(self.P_δ, self.P_ζ, self._P_ι)
 
     @property
     def w_vals(self):

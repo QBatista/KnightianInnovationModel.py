@@ -87,8 +87,8 @@ def test_bellman_op_V1_gs():
 def test_bellman_op_V2_gs():
     "Tests the function `bellman_op_V2_gs`"
 
-    π = 1 / 4
-    P_ι = np.array([1 - π, π])
+    π = μ = 1 / 4
+    P_ι = np.array([1 - μ, μ])
     P_δ = np.array([1 / 2, 1 / 2])
     P_ζ = np.array([[1 / 3, 2 / 3], [2 / 3, 1 / 3]])
 
