@@ -23,11 +23,11 @@ def test__check_approx_fixed_point():
     V1_star = np.array([1e-7] * n)
     verbose = False
 
-    assert not _check_approx_fixed_point(V1_star, V1, tol0, verbose)
-    assert _check_approx_fixed_point(V1_star, V1, tol1, verbose)
+    assert not _check_approx_fixed_point(V1_star, V1, tol0, verbose)[0]
+    assert _check_approx_fixed_point(V1_star, V1, tol1, verbose)[0]
 
-    assert not _check_approx_fixed_point(-V1_star, V1, tol0, verbose)
-    assert _check_approx_fixed_point(-V1_star, V1, tol1, verbose)
+    assert not _check_approx_fixed_point(-V1_star, V1, tol0, verbose)[0]
+    assert _check_approx_fixed_point(-V1_star, V1, tol1, verbose)[0]
 
 
 def test_bellman_op_V1_gs():

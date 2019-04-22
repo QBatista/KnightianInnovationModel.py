@@ -9,11 +9,6 @@ from interpolation import interp
 from collections import namedtuple
 
 
-# TODO:
-# - modify convergence check to check V2_star
-# - make tolerance level of error
-# - make `verbose` prettier
-
 results = namedtuple('results', 'success num_iter')
 
 # Note: V1 is V_bar, V2 is the intermediate value function
@@ -104,21 +99,34 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
         P, uc, b_vals, k_tilde_av, b_av, next_w_star, next_w = \
             method_args
 
+        if verbose:
+            print("Running Value Iteration")
+            print("----------------------------")
+
         # Iterate until convergence
-        for num_iter in range(maxiter):
+        for num_iter in range(1, maxiter + 1):
             bellman_op_V2_gs(ζ_vals, k_tilde_vals, V2_star, δ_vals, P, w_vals,
                              V1_star, π, b_vals, b_av, next_w_star, next_w,
                              ι_vals)
             bellman_op_V1_gs(ι_vals, ζ_vals, w_vals, V1_star, V2_star, β,
                              k_tilde_vals, uc, k_tilde_av)
 
-            fp1 = _check_approx_fixed_point(V1_star, V1_store, tol, verbose)
+            fp1, sup_norm1 = _check_approx_fixed_point(V1_star, V1_store, tol, verbose)
+            fp2, sup_norm2 = _check_approx_fixed_point(V2_star, V2_store, tol, verbose)
 
             V1_store[:] = V1_star
             V2_store[:] = V2_star
 
-            if fp1:  # Found approximate fixed point
+            if verbose and (num_iter % 20 == 0 or num_iter == 1):
+                print("Iteration", num_iter, ": max bellman error is",
+                      max(sup_norm1, sup_norm2))
+
+            if fp1 and fp2:  # Found approximate fixed point
                 success = 1
+                if verbose:
+                    print("")
+                    print("Converged after", num_iter, "iterations.")
+
                 break
 
     out = results(success, num_iter)
@@ -303,10 +311,7 @@ def _check_approx_fixed_point(V_current, V_previous, tol, verbose):
     # Compute the sup norm between `V_current` and `V_previous`
     sup_norm = np.max(np.abs(V_current - V_previous))
 
-    if verbose:
-        print(sup_norm)
-
     # Algorithm termination condition
     fp = sup_norm <= tol
 
-    return fp
+    return fp, sup_norm
