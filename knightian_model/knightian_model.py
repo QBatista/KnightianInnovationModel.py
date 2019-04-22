@@ -13,9 +13,6 @@ import matplotlib.pyplot as plt
 import warnings
 
 
-# TODO:
-# - Finish adding tests
-
 class KIMHouseholds():
     """
     A class for representing households in the Knightian model of innovation.
@@ -85,7 +82,7 @@ class KIMHouseholds():
                  P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=1., μ=0.5,
                  w_vals=None,  b_vals=None, k_tilde_vals=None):
 
-        # Parameters check
+        # Check if parameters are valid
         self._check_invalid_α(α)
         self._check_invalid_β(β)
 
@@ -499,6 +496,15 @@ class KnightianInnovationModel():
     """
 
     def __init__(self, households, firms, γ=0.95, K=11., L=1., M=1., R=1.02):
+        
+        # Check if parameters are valid
+        self._check_invalid_K(K)
+        self._check_invalid_L(L)
+        self._check_invalid_M(M)
+        self._check_invalid_γ(γ)
+
+        # Initialize parameters
+
         self._hh = households
         self._firms = firms
         self._K = K
@@ -509,8 +515,8 @@ class KnightianInnovationModel():
 
         self._compute_params()
 
-        (self._V1_star, self._V1_store, self._V2_star, self._V2_store, self._b_av,
-         self._k_tilde_av, self._π_star) = \
+        (self._V1_star, self._V1_store, self._V2_star, self._V2_store,
+         self._b_av, self._k_tilde_av, self._π_star) = \
             initialize_values_and_policies(self._states_vals,
                                            self.hh.b_vals)
 
@@ -540,14 +546,27 @@ class KnightianInnovationModel():
     def firms(self):
         return self._firms
 
+    def _check_invalid_K(self, value):
+        "Raise a `ValueError` if the value for K is invalid"
+
+        if value <= 0.:
+            raise ValueError('K must be positive.' )
+
     @property
     def K(self):
         return self._K
 
     @K.setter
     def K(self, new_value):
+        self._check_invalid_K(new_value)
         self._K = new_value
         self._compute_params()
+
+    def _check_invalid_L(self, value):
+        "Raise a `ValueError` if the value for L is invalid"
+
+        if value <= 0.:
+            raise ValueError('L must be positive.')
 
     @property
     def L(self):
@@ -555,8 +574,15 @@ class KnightianInnovationModel():
 
     @L.setter
     def L(self, new_value):
+        self._check_invalid_L(new_value)
         self._L = new_value
         self._compute_params()
+
+    def _check_invalid_M(self, value):
+        "Raise a `ValueError` if the value for M is invalid"
+
+        if value <= 0.:
+            raise ValueError('M must be positive.')
 
     @property
     def M(self):
@@ -564,6 +590,7 @@ class KnightianInnovationModel():
 
     @M.setter
     def M(self, new_value):
+        self._check_invalid_M(new_value)
         self._M = new_value
         self._compute_params()
 
@@ -576,12 +603,19 @@ class KnightianInnovationModel():
         self._R = new_value
         self._compute_params()
 
+    def _check_invalid_γ(self, value):
+        "Raise a `ValueError` if the value for γ is invalid"
+
+        if value <= 0.:
+            raise ValueError('γ must be positive.')
+
     @property
     def γ(self):
         return self._γ
 
     @γ.setter
     def γ(self, new_value):
+        self._check_invalid_γ(new_value)
         self._γ = new_value
         self._compute_params()
 

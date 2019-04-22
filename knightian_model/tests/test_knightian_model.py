@@ -4,8 +4,9 @@ Tests for 'knightian_model.py"
 """
 
 import numpy as np
-from knightian_model import KIMHouseholds
+from knightian_model import KIMHouseholds, KIMFirms, KnightianInnovationModel
 import pytest
+
 
 def test_P_δ_invalid():
     P_δ_neg = np.array([-0.5, 0.5])
@@ -15,6 +16,7 @@ def test_P_δ_invalid():
     for P_δ_invalid in [P_δ_neg, P_δ_1, P_δ_sum]:
         with pytest.raises(ValueError) as e_info:
             KIMHouseholds(P_δ=P_δ_invalid)
+
 
 def test_shapes_invalid():
     δ_vals = np.array([1., 1.1, 1.2])
@@ -33,11 +35,13 @@ def test_shapes_invalid():
         with pytest.raises(ValueError) as e_info:
             KIMHouseholds(ζ_vals=ζ_vals, P_ζ=P_ζ1)
 
+
 def test_α_invalid():
     α = 1.1
 
     with pytest.raises(ValueError) as e_info:
         KIMHouseholds(α=α)
+
 
 def test_β_invalid():
     β = 1.1
@@ -45,9 +49,26 @@ def test_β_invalid():
     with pytest.raises(ValueError) as e_info:
         KIMHouseholds(β=β)
 
+
 def test_π_invalid():
     π = 1.1
     
     with pytest.raises(ValueError) as e_info:
         KIMHouseholds(π=π)
-        
+
+ 
+def test_invalid_aggregate():
+    invalid_aggregate = -0.5
+   
+    hh = KIMHouseholds()
+    firms = KIMFirms()
+
+    with pytest.raises(ValueError) as e_info:
+        KnightianInnovationModel(hh, firms, K=invalid_aggregate)
+
+    with pytest.raises(ValueError) as e_info:
+        KnightianInnovationModel(hh, firms, L=invalid_aggregate)
+
+    with pytest.raises(ValueError) as e_info:
+        KnightianInnovationModel(hh, firms, M=invalid_aggregate)
+
