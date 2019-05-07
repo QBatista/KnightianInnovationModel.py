@@ -3,5 +3,6 @@ Import the main name to the top level.
 
 """
 
-from .knightian_model import (KIMHouseholds, KIMFirms,
-                              KnightianInnovationModel)
+from .knightian_households import KIMHouseholds
+from .knightian_firms import KIMFirms
+from .knightian_market import KnightianInnovationModel
