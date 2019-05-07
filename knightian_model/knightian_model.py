@@ -13,6 +13,11 @@ import matplotlib.pyplot as plt
 import warnings
 
 
+# TODO(QBatista):
+# - Rename classes
+# - Break up into 3 files
+# - Implement initial guess for V_star
+
 class KIMHouseholds():
     """
     A class for representing households in the Knightian model of innovation.
@@ -79,7 +84,7 @@ class KIMHouseholds():
 
     def __init__(self, α=1., ν=2., β=0.9, δ_vals=np.array([0.9, 0.95]),
                  P_δ=np.array([0.5, 0.5]), ζ_vals=np.array([1., 5.]),
-                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=1., μ=0.5,
+                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=0.5, μ=0.5,
                  w_vals=None,  b_vals=None, k_tilde_vals=None):
 
         # Check if parameters are valid
@@ -496,7 +501,7 @@ class KnightianInnovationModel():
     """
 
     def __init__(self, households, firms, γ=0.95, K=11., L=1., M=1., R=1.02):
-        
+
         # Check if parameters are valid
         self._check_invalid_K(K)
         self._check_invalid_L(L)
@@ -688,16 +693,15 @@ class KnightianInnovationModel():
         w_max = self.hh.w_vals.max()
 
         if self.Γ_star > w_max:
-            warning.warn('w_max is lower than Γ_star: this is problematic' +
-                         'for extrapolation.', category=RuntimeWarning)
+            warnings.warn('w_max is lower than Γ_star.',
+                         category=RuntimeWarning)
 
         if self.Γ_star / w_max > 0.1:
-            warnings.warn('Γ_star is high relative to the maximum wealth:' +
-                          'this might result in a low quality extrapolation.',
+            warnings.warn('Γ_star is high relative to the maximum wealth.',
                           category=RuntimeWarning)
 
         if self.R - 1 > self.r:
-            warnings.warn('Risk-free rate is higher than risky return.',
+            warnings.warn('The risk-free rate is higher than risky rate.',
                           category=RuntimeWarning)
 
         if self.Γ_star <= 0:
@@ -710,7 +714,7 @@ class KnightianInnovationModel():
             warnings.warn('p_M is not positive.', category=RuntimeWarning)
 
         if self.hh.ζ_vals.min() * self.wage >= self.Γ_star:
-            warnings.warn('Γ_star is lower than the minimum earnings from' +
+            warnings.warn('Γ_star is lower than the minimum earnings from ' +
                           'labor', category=RuntimeWarning)
 
         if (self.hh.δ_vals * (1 + self.r)).mean() <= self.R:
@@ -719,7 +723,7 @@ class KnightianInnovationModel():
 
         if (self.hh.δ_vals * (1 + self.r)).mean() * self.hh.β >= 1.:
             warnings.warn('Expected value of (1+r) * β is greater or equal' +
-                          'to 1.', category=RuntimeWarning)
+                           'to 1.', category=RuntimeWarning)
 
     def solve_household_DP_problem(self, method=0, tol=1e-7):
         if method == 0:
