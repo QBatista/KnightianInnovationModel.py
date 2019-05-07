@@ -4,10 +4,12 @@ A module for representing the market in the Knightian innovation model
 """
 
 import numpy as np
+from scipy.stats import gaussian_kde
 from knightian_model import KIMHouseholds, KIMFirms
 from .helper_functions import (create_next_w, create_uc_grid,
     initialize_values_and_policies, compute_policy_grid)
 from .household_dp_solvers import solve_dp_vi
+from .stationary_distribution import MC
 import matplotlib.pyplot as plt
 import warnings
 
@@ -454,11 +456,56 @@ class KnightianInnovationModel():
         plt.subplots_adjust(top=0.95)
         plt.show()
 
-    def plot_stationary_distribution():
-        raise NotImplementedError("Coming soon.")
+    def plot_stationary_distribution(self, popu, pdfs):
 
-    def compute_stationary_distribution(self):
-        raise NotImplementedError("Coming soon.")
+        for ζ_i, ζ_val in enumerate(self.hh.ζ_vals):
+
+            pdf = pdfs[ζ_i]
+            sub_popu = popu[popu[:, 1] == ζ_i, :]
+
+            # histgram of population distribution over w
+            plt.hist(sub_popu[:, 0], bins=50, density=True, label="sample")
+
+            # the kernel density fit
+            w_max = max(sub_popu[:, 0])
+            w_min = min(sub_popu[:, 0])
+            plt.plot(np.linspace(w_min, w_max, 100),
+                     pdf(np.linspace(w_min, w_max, 100)),
+                     label="kernel density fit")
+
+            plt.title(f"stationary distribution P(w, ζ={ζ_val})")
+            plt.xlabel("w")
+            plt.ylabel(f"P(w, ζ={ζ_val})")
+            plt.legend()
+            plt.show()
+
+    def compute_stationary_distribution(self, N=10000):
+        """
+        set equal intial population for different ζ values.
+        each subgroup has population size N.
+        """
+
+        # initialize the population
+        popu = np.empty((2 * N, 2))
+
+        w_min, w_max = min(self.hh.w_vals), max(self.hh.w_vals)
+        popu[:N, 0] = np.linspace(w_min, w_max, N)
+        popu[:N, 1] = 0
+        popu[N:, 0] = np.linspace(w_min, w_max, N)
+        popu[N:, 1] = 1
+
+        # Monte Carlo Simulation
+        # set μ = 0.5 for now
+        # need to change it to self.hh.μ
+        MC(popu, self.π_star, self.hh.w_vals, self.hh.ζ_vals,
+           self.hh.δ_vals, self.Γ_star, self.hh.P_ζ, self.hh.P_δ,
+           0.5, self.hh.π, self.r, self.R)
+
+        # kernel density fit
+        pdfs = [gaussian_kde(popu[popu[:, 1] == ζ_i, 0])
+                for ζ_i in range(len(self.hh.ζ_vals))]
+
+        return popu, pdfs
 
     def solve(self):
         raise NotImplementedError("Coming soon.")
