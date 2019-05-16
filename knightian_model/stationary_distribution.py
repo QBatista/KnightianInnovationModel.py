@@ -35,7 +35,7 @@ def MC(popu, π_star, w_vals, ζ_vals, δ_vals, Γ_star, P_ζ, P_δ, μ, π, r, 
             δ_i = 0 if δ_draw_rvs[i, j] < P_δ[0] else 1
             δ = δ_vals[δ_i]
 
-            next_w = (1 + r) * δ * k_tilde +(R - (1+r)  * δ) * b
+            next_w = (1 + r) * δ * k_tilde +(R - (1+r) * δ) * b
 
             # the invention decision
             p_invention = interp(w_vals, π_star[ι, ζ_i, :, 0], w)

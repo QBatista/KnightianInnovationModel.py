@@ -479,7 +479,8 @@ class KnightianInnovationModel():
             plt.legend()
             plt.show()
 
-    def compute_stationary_distribution(self, N=10000):
+    def compute_stationary_distribution(self, N=10000, seed=1234, maxiter=1000,
+                                        tol=1e-5, verbose=True):
         """
         set equal intial population for different ζ values.
         each subgroup has population size N.
@@ -499,7 +500,8 @@ class KnightianInnovationModel():
         # need to change it to self.hh.μ
         MC(popu, self.π_star, self.hh.w_vals, self.hh.ζ_vals,
            self.hh.δ_vals, self.Γ_star, self.hh.P_ζ, self.hh.P_δ,
-           0.5, self.hh.π, self.r, self.R)
+           0.5, self.hh.π, self.r, self.R, seed=seed, maxiter=maxiter,
+           tol=tol, verbose=verbose)
 
         # kernel density fit
         pdfs = [gaussian_kde(popu[popu[:, 1] == ζ_i, 0])

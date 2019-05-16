@@ -271,10 +271,13 @@ def compute_aggregates(integrand, π_star, popu, pdfs,
             for i in range(2):
 
                 # need to change 0.5 to model.hh.P_ι[ι_i]
+                # normalize the kernel densities
                 aggregates[i] += 0.5 * ζ_weight * \
                             integrate.quad(integrand, w_min, w_max,
                                            args=(w_vals, pdfs[ζ_i],
                                                  π_star[ι_i, ζ_i, :, i+1]),
+                                           limit=limit)[0] / \
+                            integrate.quad(pdfs[ζ_i], w_min, w_max,
                                            limit=limit)[0]
 
     # K = K_tilde - B if both K_tilde and B are integrable
