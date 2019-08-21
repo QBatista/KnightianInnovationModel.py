@@ -4,7 +4,7 @@ A module for representing the market in the Knightian innovation model
 """
 
 import numpy as np
-from scipy.stats import gaussian_kde
+from interpolation import interp
 from knightian_model import KIMHouseholds, KIMFirms
 from .helper_functions import (create_next_w, create_uc_grid,
     initialize_values_and_policies, compute_policy_grid)
@@ -456,23 +456,14 @@ class KnightianInnovationModel():
         plt.subplots_adjust(top=0.95)
         plt.show()
 
-    def plot_stationary_distribution(self, popu, pdfs):
+    def plot_stationary_distribution(self, popu):
 
         for ζ_i, ζ_val in enumerate(self.hh.ζ_vals):
 
-            pdf = pdfs[ζ_i]
             sub_popu = popu[popu[:, 1] == ζ_i, :]
 
             # histgram of population distribution over w
             plt.hist(sub_popu[:, 0], bins=50, density=True, label="sample")
-
-            # the kernel density fit
-            w_max = max(sub_popu[:, 0])
-            w_min = min(sub_popu[:, 0])
-            plt.plot(np.linspace(w_min, w_max, 100),
-                     pdf(np.linspace(w_min, w_max, 100)),
-                     label="kernel density fit")
-
             plt.title(f"stationary distribution P(w, ζ={ζ_val})")
             plt.xlabel("w")
             plt.ylabel(f"P(w, ζ={ζ_val})")
@@ -503,11 +494,35 @@ class KnightianInnovationModel():
            0.5, self.hh.π, self.r, self.R, seed=seed, maxiter=maxiter,
            tol=tol, verbose=verbose)
 
-        # kernel density fit
-        pdfs = [gaussian_kde(popu[popu[:, 1] == ζ_i, 0])
-                for ζ_i in range(len(self.hh.ζ_vals))]
+        return popu
 
-        return popu, pdfs
+    def compute_aggregates(self, popu):
+        """
+        compute aggregates using stationary distribution.
+        """
+
+        # simplify notations
+        π_star, w_vals, ζ_vals = self.π_star, self.hh.w_vals, self.hh.ζ_vals
+
+        # K_tilde and B
+        aggregates = np.zeros(2)
+        for ζ_i in range(len(ζ_vals)):
+            w_subsample = popu[popu[:, 1] == ζ_i, 0]
+            ζ_weight = len(w_subsample) / len(popu)
+            for ι_i in range(2):
+                # compute K_tilde and B
+                for i in range(2):
+
+                    # need to change 0.5 to model.hh.P_ι[ι_i]
+                    aggregates[i] += 0.5 * ζ_weight * \
+                        interp(w_vals, π_star[ι_i, ζ_i, :, i+1],
+                               w_subsample).mean()
+
+        # K = K_tilde - B
+        K = aggregates[0] - aggregates[1]
+        B = aggregates[1]
+
+        return K, B
 
     def solve(self):
         raise NotImplementedError("Coming soon.")

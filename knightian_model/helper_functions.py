@@ -5,8 +5,6 @@ Helper routines for solving the Knightian model.
 
 import numpy as np
 from numba import njit, prange
-from interpolation import interp
-import scipy.integrate as integrate
 
 # TODO: Add a method to compute j_bar and Γ_star
 
@@ -239,49 +237,3 @@ def create_P(P_δ, P_ζ, P_ι):
         P_ι[None, None, None, :]
 
     return P
-
-def integrand(w, w_vals, pdf, A_star):
-    """
-    integrand for aggregates computation.
-
-    A = K_tilde, B
-    """
-    A = interp(w_vals, A_star, w)
-    density = pdf(w)
-
-    return density * A
-
-def compute_aggregates(integrand, π_star, popu, pdfs,
-                       w_vals, ζ_vals, limit=100):
-    """
-    compute aggregates using stationary distribution.
-
-    limit: the maximum number of subdivisions
-    """
-
-    # K_tilde and B
-    aggregates = np.zeros(2)
-    for ζ_i in range(len(ζ_vals)):
-        w_subsample = popu[popu[:, 1] == ζ_i, 0]
-        ζ_weight = len(w_subsample) / len(popu)
-        w_min = w_subsample.min()
-        w_max = w_subsample.max()  
-        for ι_i in range(2):
-            # compute K_tilde and B
-            for i in range(2):
-
-                # need to change 0.5 to model.hh.P_ι[ι_i]
-                # normalize the kernel densities
-                aggregates[i] += 0.5 * ζ_weight * \
-                            integrate.quad(integrand, w_min, w_max,
-                                           args=(w_vals, pdfs[ζ_i],
-                                                 π_star[ι_i, ζ_i, :, i+1]),
-                                           limit=limit)[0] / \
-                            integrate.quad(pdfs[ζ_i], w_min, w_max,
-                                           limit=limit)[0]
-
-    # K = K_tilde - B if both K_tilde and B are integrable
-    K = aggregates[0] - aggregates[1]
-    B = aggregates[1]
-
-    return K, B
