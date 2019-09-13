@@ -501,13 +501,14 @@ class KnightianInnovationModel():
             Marker size of the points in the plot.
 
         """
+        n = self.hh.ζ_vals.size
 
         subplot_titles = ['Stationary Distribution for ζ=' + str(ζ_val)
                           for ζ_val in self.hh.ζ_vals]
 
         subplots = make_subplots(rows=len(self.hh.ζ_vals), cols=1,
                                  subplot_titles=subplot_titles,
-                                 specs=[[{}], [{}]])
+                                 specs=[[{}]] * n)
 
         fig = go.Figure(subplots)
 
@@ -529,19 +530,17 @@ class KnightianInnovationModel():
         """
 
         # initialize the population
-        popu = np.empty((2 * N, 2))
+        popu = np.empty((N, 2))
 
         w_min, w_max = min(self.hh.w_vals), max(self.hh.w_vals)
-        popu[:N, 0] = np.linspace(w_min, w_max, N)
-        popu[:N, 1] = 0
-        popu[N:, 0] = np.linspace(w_min, w_max, N)
-        popu[N:, 1] = 1
+        popu[:, 0] = np.linspace(w_min, w_max, N)
+        popu[:, 1] = 0
+
+        P_ζ_cdfs = self.hh.P_ζ.cumsum(axis=1)
 
         # Monte Carlo Simulation
-        # set μ = 0.5 for now
-        # need to change it to self.hh.μ
         MC(popu, self.π_star, self.hh.w_vals, self.hh.ζ_vals,
-           self.hh.δ_vals, self.Γ_star, self.hh.P_ζ, self.hh.P_δ,
+           self.hh.δ_vals, self.Γ_star, P_ζ_cdfs, self.hh.P_δ,
            self.hh.μ, self.hh.π, self.r, self.R, seed=seed, maxiter=maxiter,
            tol=tol, verbose=verbose)
 
