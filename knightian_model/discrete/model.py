@@ -573,7 +573,7 @@ class KnightianInnovationModel():
 
         # K_tilde and B
         aggregates = np.zeros(2)
-        for h_i in range(self.hh.π.size)
+        for h_i in range(self.hh.π.size):
             for ζ_i in range(len(ζ_vals)):
                 w_subsample = popu[popu[:, 1, h_i] == ζ_i, 0, h_i]
                 ζ_weight = len(w_subsample) / len(popu)
