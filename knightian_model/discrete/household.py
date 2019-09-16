@@ -15,8 +15,9 @@ class Household():
 
     Parameters
     ----------
-    α : scalar(float), optional(default=1.)
-        Measure of bold households.
+    α : ndarray(float, ndim=1), optional(default=np.array([1.]))
+        Distribution of households over perceived probability distributions
+        of inventions being successful.
 
     ν : scalar(float), optional(default=2.)
         Coefficient of relative risk aversion.
@@ -36,8 +37,8 @@ class Household():
     P_ζ : ndarray(float, ndim=2), optional(default=np.array([[0.5, 0.5], [0.5, 0.5]]))
         Markov transition matrix for ζ.
 
-    π : scalar(float), optional(default=1.)
-        Probability of an invention being successful.
+    π : ndarray(float, ndim=1), optional(default=np.array([0.5]))
+        Perceived probabilities of an invention being successful.
 
     μ : scalar(float), optional(default=0.5)
         Arrival rate of invention opportunities.
@@ -73,10 +74,12 @@ class Household():
 
     """
 
-    def __init__(self, α=1., ν=2., β=0.9, δ_vals=np.array([0.9, 0.95]),
-                 P_δ=np.array([0.5, 0.5]), ζ_vals=np.array([1., 5.]),
-                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]), π=0.5, μ=0.5,
-                 w_vals=None,  b_vals=None, k_tilde_vals=None):
+    def __init__(self, α=np.array([1.]), ν=2., β=0.9,
+                 δ_vals=np.array([0.9, 0.95]), P_δ=np.array([0.5, 0.5]),
+                 ζ_vals=np.array([1., 5.]),
+                 P_ζ=np.array([[0.5, 0.5], [0.5, 0.5]]),
+                 π=np.array([0.5]), μ=0.5, w_vals=None,  b_vals=None,
+                 k_tilde_vals=None):
 
         # Check if parameters are valid
         self._check_invalid_α(α)
@@ -87,8 +90,7 @@ class Household():
                              'match. Please change the values appropriately.')
 
         if (P_δ < 0.).any() or (P_δ > 1.).any() or P_δ.sum() != 1.:
-            raise ValueError('The new value of P_δ is not a valid ' +
-                             'probability distribution.')
+            raise ValueError('P_δ is not a valid probability distribution.')
 
         if ζ_vals.size != P_ζ.shape[0]:
             raise ValueError('The dimensions of `ζ_vals` and `P_ζ` do not ' +
@@ -143,21 +145,24 @@ class Household():
         """
         Household parameters
         --------------------------------
-        Measure of bold households α = %s
+        Distribution of households α = %s
         Coefficient of relative risk aversion ν = %s
         Discount factor β = %s
-        Inventing success rate π = %s
+        Distribution of perceived probabilities invention success of π = %s
         Arrival rate of invention opportunities μ = %s
+        Labor income shocks ζ_vals = %s
+        Depreciation shocks δ_vals = %s
 
-        """ % (self.α, self.ν, self.β, self.π, self.μ)
+        """ % (self.α, self.ν, self.β, self.π, self.μ, self.ζ_vals,
+               self.δ_vals)
 
         return out
 
     def _check_invalid_α(self, value):
         "Raise a `ValueError` if the value of α is invalid"
 
-        if value > 1. or value < 0.:
-            raise ValueError('α must be between 0 and 1.')
+        if (value < 0.).any() or (value > 1.).any() or value.sum() != 1.:
+            raise ValueError('α is not a valid probability distribution.')
 
     @property
     def α(self):
@@ -244,8 +249,9 @@ class Household():
     def _check_invalid_π(self, value):
         "Raise a `ValueError` if the value of π is invalid"
 
-        if value > 1. or value < 0.:
-            raise ValueError('π must be between 0 and 1.')
+        for π in value:
+            if π > 1. or π < 0.:
+                raise ValueError('π must be between 0 and 1.')
 
     @property
     def π(self):

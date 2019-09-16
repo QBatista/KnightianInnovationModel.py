@@ -98,7 +98,7 @@ def solve_dp_vi(V1_star, V1_store, V2_star, V2_store, states_vals, δ_vals, π,
 
         if verbose:
             print("Running Value Iteration")
-            print("----------------------------")
+            print("-" * 35)
 
         # Iterate until convergence
         for num_iter in range(1, maxiter + 1):

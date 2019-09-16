@@ -6,10 +6,12 @@ from numba import njit, prange
 
 @njit(parallel=True)
 def MC(popu, π_star, w_vals, ζ_vals, δ_vals, Γ_star, P_ζ_cdfs, P_δ, μ, π, r, R,
-       seed=1234, maxiter=1000, tol=1e-5, verbose=True):
+       maxiter=1000, tol=1e-5, verbose=True):
     """
     Monte Carlo simulation.
     """
+
+    # π is the true probability of invention success, not the perceived one
 
     N = popu.shape[0]
 

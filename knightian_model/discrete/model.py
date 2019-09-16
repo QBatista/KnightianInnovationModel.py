@@ -28,7 +28,10 @@ colors = ['#1f77b4',  # muted blue
           '#17becf'   # blue-teal
           ]
 
-# TODO(QBatista): Implement initial guess for V_star
+# TODO(QBatista):
+# - Implement initial guess for V_star
+# - Figure out how to best deal with the true probability of invention success
+#   for MC simulation
 
 class KnightianInnovationModel():
     """
@@ -37,11 +40,12 @@ class KnightianInnovationModel():
 
     Parameters
     ----------
-    households : object
-        Instance of DiscreteHousehold representing the households in the model.
+    households : Households
+        Instance of Households representing the households in the
+        model.
 
     firms : object
-        Instance of DiscreteFirm representing the firms in the model.
+        Instance of Firm representing the firms in the model.
 
     γ : scalar(float), optional(default=0.95)
         Obsolescence rate of intermediate good techonologies.
@@ -115,10 +119,9 @@ class KnightianInnovationModel():
 
         self._compute_params()
 
-        (self._V1_star, self._V1_store, self._V2_star, self._V2_store,
-         self._b_av, self._k_tilde_av, self._π_star) = \
-            initialize_values_and_policies(self._states_vals,
-                                           self.hh.b_vals)
+        self.solution_data = [initialize_values_and_policies(self._states_vals,
+                                                             self.hh.b_vals)
+                              for i in range(households.α.size)]
 
     def __repr__(self):
         self._params = \
@@ -133,6 +136,7 @@ class KnightianInnovationModel():
         Wage `wage` = %s
         Present value of a new intermediate goods invention Γ_star = %s
         Oldest technology j_bar = %s
+
         """ % (self.K, self.L, self.M, self.r, self.R, self.wage, self.Γ_star,
                self.j_bar)
 
@@ -239,26 +243,6 @@ class KnightianInnovationModel():
     def j_bar(self):
         return self._j_bar
 
-    @property
-    def V1_star(self):
-        return self._V1_star
-
-    @property
-    def V2_star(self):
-        return self._V2_star
-
-    @property
-    def π_star(self):
-        return self._π_star
-
-    @property
-    def b_av(self):
-        return self._b_av
-
-    @property
-    def k_tilde_av(self):
-        return self._k_tilde_av
-
     def _compute_params(self):
         # Compute prices
         self._r = self.firms.F_K(self.K, self.L, self.M)
@@ -324,22 +308,32 @@ class KnightianInnovationModel():
         if method == 0:
             uc = create_uc_grid(self.hh.u, self._states_vals, self.wage)
 
-            method_args = \
-                (self.hh.P, uc, self.hh.b_vals, self._k_tilde_av, self.b_av,
-                 self.hh._next_w_star, self.hh._next_w)
+            for i, π in enumerate(self.hh.π):
+                V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star = \
+                    self.solution_data[i]
 
-            results = solve_dp_vi(self._V1_star, self._V1_store, self.V2_star,
-                                  self._V2_store, self._states_vals,
-                                  self.hh.δ_vals,
-                                  self.hh.π, self.hh.β, method, method_args,
-                                  tol=tol)
+                method_args = \
+                    (self.hh.P, uc, self.hh.b_vals, k_tilde_av, b_av,
+                    self.hh._next_w_star, self.hh._next_w)
 
-            compute_policy_grid(self._π_star, self._V1_star, self._b_av,
-                                self.hh.b_vals, self._k_tilde_av,
-                                self.hh.k_tilde_vals)
+                print("=" * 37)
+                print('Solving problem of household', str(i+1), 'out of',
+                      self.hh.π.size, '(π=' + str(π) + ')')
+                print("=" * 37)
 
-    def plot_value_functions(self, height=1400, width=1400, renderer='browser',
-                             markersize=1.5):
+                results = solve_dp_vi(V1_star, V1_store, V2_star, V2_store,
+                                      self._states_vals, self.hh.δ_vals, π,
+                                      self.hh.β, method, method_args, tol=tol)
+
+                print("-" * 35)
+                print('Compute optimal policy...')
+                compute_policy_grid(π_star, V1_star, b_av,
+                                    self.hh.b_vals, k_tilde_av,
+                                    self.hh.k_tilde_vals)
+                print('...completed')
+
+    def plot_value_function(self, height=1400, width=1400, renderer='browser',
+                            markersize=1.5):
         """
         Plot the value function.
 
@@ -360,39 +354,47 @@ class KnightianInnovationModel():
             Marker size of the points in the plot.
 
         """
-
-        subplot_titles = [r'$V_1(ω, ζ, ι=0)$',
-                          r'$V_1(ω, ζ, ι=1)$',
-                          r'$V_2(\tilde{k}, ζ, ι=0)$',
-                          r'$V_2(\tilde{k}, ζ, ι=1)$']
+        subplot_titles = [r'$V_1(ω, ζ, ι=0; π)$',
+                          r'$V_1(ω, ζ, ι=1; π)$',
+                          r'$V_2(\tilde{k}, ζ, ι=0; π)$',
+                          r'$V_2(\tilde{k}, ζ, ι=1; π)$']
 
         subplots = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles,
                                  specs=[[{}, {}],
                                         [{}, {}]])
 
         fig = go.Figure(subplots)
+        mode = 'markers'
 
-        for ι in self.hh.ι_vals:
-            col_nb = int(ι + 1)
-            for ζ_i, ζ in enumerate(self.hh.ζ_vals):
-                fig.add_trace(go.Scatter(x=self.hh.w_vals,
-                                         y=self.V1_star[ι, ζ_i, :],
-                                         name=r'ζ=' + str(ζ),
-                                         mode='markers',
-                                         marker=dict(size=markersize,
-                                                     color=colors[ζ_i]),
-                                         legendgroup=colors[ζ_i],
-                                         showlegend=bool(ι == 0 )),
-                              row=1, col=col_nb)
+        for h_i, π in enumerate(self.hh.π):
+            V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star = \
+                self.solution_data[h_i]
+            for ι in self.hh.ι_vals:
+                col_nb = int(ι + 1)
+                for ζ_i, ζ in enumerate(self.hh.ζ_vals):
+                    group = h_i * self.hh.ζ_vals.size + ζ_i
+                    name = 'ζ=' + str(ζ) + ', π=' + str(π)
+                    marker = dict(size=markersize, color=colors[ζ_i])
+                    legendgroup = colors[group]
+                    showlegend = bool(ι == 0)
 
-                fig.add_trace(go.Scatter(x=self.hh.k_tilde_vals,
-                                         y=self.V2_star[ζ_i, :, ι],
-                                         name=r'ζ=' + str(ζ),
-                                         mode='markers',
-                                         marker=dict(size=markersize, color=colors[ζ_i]),
-                                         legendgroup=colors[ζ_i],
-                                         showlegend=False),
-                              row=2, col=col_nb)
+                    fig.add_trace(go.Scatter(x=self.hh.w_vals,
+                                             y=V1_star[ι, ζ_i, :],
+                                             name=name,
+                                             mode=mode,
+                                             marker=marker,
+                                             legendgroup=legendgroup,
+                                             showlegend=showlegend),
+                                  row=1, col=col_nb)
+
+                    fig.add_trace(go.Scatter(x=self.hh.k_tilde_vals,
+                                             y=V2_star[ζ_i, :, ι],
+                                             name=name,
+                                             mode=mode,
+                                             marker=marker,
+                                             legendgroup=legendgroup,
+                                             showlegend=False),
+                                  row=2, col=col_nb)
 
         fig.update_layout(height=height, width=width)
 
@@ -435,43 +437,79 @@ class KnightianInnovationModel():
                           'Savings when ι=1'
                          ]
 
-        k = self.π_star[:, :, :, 1] - self.π_star[:, :, :, 2]
-        c = (1 - self.π_star[:, :, :, 0]) * self.hh.ζ_vals.reshape((1, -1, 1)) * self.wage + \
-                    self.hh.w_vals - self.π_star[:, :, :, 1]
-        s = self.π_star[:, :, :, 1] - self.hh.w_vals.reshape((1, 1, -1))
-
-        data = [(self.hh.w_vals, self.π_star[:, :, :, 0]),
-                    (self.hh.w_vals, self.π_star[:, :, :, 1]),
-                    (self.hh.k_tilde_vals, self.π_star[:, :, :, 2]),
-                    (self.hh.w_vals, k),
-                    (self.hh.w_vals, c),
-                    (self.hh.w_vals, s)]
-
-        nb_rows = len(data)
+        nb_rows = len(subplot_titles) // 2
         subplots = make_subplots(rows=nb_rows, cols=2,
                                  subplot_titles=subplot_titles,
                                  specs=[[{}, {}]] * nb_rows)
 
         fig = go.Figure(subplots)
+        mode = 'markers'
 
-        for ι in self.hh.ι_vals:
-            col_nb = int(ι + 1)
-            for ζ_i, ζ in enumerate(self.hh.ζ_vals):
-                for row_nb, (x, y) in enumerate(data):
-                    fig.add_trace(go.Scatter(x=x,
-                                             y=y[ι, ζ_i, :],
-                                     name=r'ζ=' + str(ζ),
-                                     mode='markers',
-                                     marker=dict(size=markersize,
-                                                 color=colors[ζ_i]),
-                                     legendgroup=colors[ζ_i],
-                                     showlegend=bool(ι == 0 and row_nb == 0)),
-                          row=row_nb+1, col=col_nb)
+        for h_i, π in enumerate(self.hh.π):
+            V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star = \
+                self.solution_data[h_i]
+            k = π_star[:, :, :, 1] - π_star[:, :, :, 2]
+            c = (1 - π_star[:, :, :, 0]) * self.hh.ζ_vals.reshape((1, -1, 1)) * self.wage + \
+                        self.hh.w_vals - π_star[:, :, :, 1]
+            s = π_star[:, :, :, 1] - self.hh.w_vals.reshape((1, 1, -1))
+
+            data = [(self.hh.w_vals, π_star[:, :, :, 0]),
+                    (self.hh.w_vals, π_star[:, :, :, 1]),
+                    (self.hh.k_tilde_vals, π_star[:, :, :, 2]),
+                    (self.hh.w_vals, k),
+                    (self.hh.w_vals, c),
+                    (self.hh.w_vals, s)]
+
+            for ι in self.hh.ι_vals:
+                col_nb = int(ι + 1)
+                for ζ_i, ζ in enumerate(self.hh.ζ_vals):
+                    for row_nb, (x, y) in enumerate(data):
+                        group = h_i * self.hh.ζ_vals.size + ζ_i
+                        name = r'ζ=' + str(ζ) + ', π=' + str(π)
+                        showlegend = bool(ι == 0 and row_nb == 0)
+                        legendgroup = colors[group]
+                        marker = dict(size=markersize, color=colors[ζ_i])
+                        fig.add_trace(go.Scatter(x=x,
+                                                 y=y[ι, ζ_i, :],
+                                                 name=name,
+                                                 mode=mode,
+                                                 marker=marker,
+                                                 legendgroup=legendgroup,
+                                                 showlegend=showlegend),
+                                      row=row_nb+1, col=col_nb)
 
         fig.update_xaxes(title_text=r'$w$')
         fig.update_layout(height=height, width=width)
 
         fig.show(renderer)
+
+    def compute_stationary_distribution(self, N=10000, maxiter=1000,
+                                        tol=1e-5, verbose=True):
+        """
+        set equal intial population for different ζ values.
+        each subgroup has population size N.
+        """
+
+        # initialize the population
+        popu = np.empty((N, 2, self.hh.π.size))
+
+        w_min, w_max = min(self.hh.w_vals), max(self.hh.w_vals)
+        popu[:, 0] = np.linspace(w_min, w_max, N)[:, np.newaxis]
+        popu[:, 1] = 0
+
+        P_ζ_cdfs = self.hh.P_ζ.cumsum(axis=1)
+
+        for h_i in range(self.hh.π.size):
+            V1_star, V1_store, V2_star, V2_store, b_av, k_tilde_av, π_star = \
+                self.solution_data[h_i]
+
+            # Monte Carlo Simulation
+            MC(popu[:, :, h_i], π_star, self.hh.w_vals, self.hh.ζ_vals,
+               self.hh.δ_vals, self.Γ_star, P_ζ_cdfs, self.hh.P_δ,
+               self.hh.μ, self.hh.π[0], self.r, self.R, maxiter=maxiter,
+               tol=tol, verbose=verbose)
+
+        return popu
 
     def plot_stationary_distribution(self, popu, bins=50, height=2000,
                                      width=1400, renderer='browser'):
@@ -501,50 +539,29 @@ class KnightianInnovationModel():
             Marker size of the points in the plot.
 
         """
-        n = self.hh.ζ_vals.size
+        n = self.hh.ζ_vals.size * self.hh.π.size
 
-        subplot_titles = ['Stationary Distribution for ζ=' + str(ζ_val)
-                          for ζ_val in self.hh.ζ_vals]
+        subplot_titles = ['Stationary Distribution for ζ=' + str(ζ_val) +
+                          ', π=' + str(π) for ζ_val in self.hh.ζ_vals
+                          for π in self.hh.π]
 
-        subplots = make_subplots(rows=len(self.hh.ζ_vals), cols=1,
+        subplots = make_subplots(rows=n, cols=1,
                                  subplot_titles=subplot_titles,
                                  specs=[[{}]] * n)
 
         fig = go.Figure(subplots)
 
-        for ζ_i, ζ_val in enumerate(self.hh.ζ_vals):
-            sub_popu = popu[(popu[:, 1] == ζ_i), 0]
+        for h_i in range(self.hh.π.size):
+            for ζ_i, ζ_val in enumerate(self.hh.ζ_vals):
+                row_nb = h_i * self.hh.ζ_vals.size + ζ_i + 1
+                sub_popu = popu[popu[:, 1, h_i] == ζ_i, 0, h_i]
 
-            fig.add_trace(go.Histogram(x=sub_popu, histnorm='probability'),
-                          row=ζ_i+1, col=1)
+                fig.add_trace(go.Histogram(x=sub_popu, histnorm='probability'),
+                              row=row_nb, col=1)
 
         fig.update_layout(height=height, width=width)
 
         fig.show(renderer)
-
-    def compute_stationary_distribution(self, N=10000, seed=1234, maxiter=1000,
-                                        tol=1e-5, verbose=True):
-        """
-        set equal intial population for different ζ values.
-        each subgroup has population size N.
-        """
-
-        # initialize the population
-        popu = np.empty((N, 2))
-
-        w_min, w_max = min(self.hh.w_vals), max(self.hh.w_vals)
-        popu[:, 0] = np.linspace(w_min, w_max, N)
-        popu[:, 1] = 0
-
-        P_ζ_cdfs = self.hh.P_ζ.cumsum(axis=1)
-
-        # Monte Carlo Simulation
-        MC(popu, self.π_star, self.hh.w_vals, self.hh.ζ_vals,
-           self.hh.δ_vals, self.Γ_star, P_ζ_cdfs, self.hh.P_δ,
-           self.hh.μ, self.hh.π, self.r, self.R, seed=seed, maxiter=maxiter,
-           tol=tol, verbose=verbose)
-
-        return popu
 
     def compute_aggregates(self, popu):
         """
@@ -556,17 +573,16 @@ class KnightianInnovationModel():
 
         # K_tilde and B
         aggregates = np.zeros(2)
-        for ζ_i in range(len(ζ_vals)):
-            w_subsample = popu[popu[:, 1] == ζ_i, 0]
-            ζ_weight = len(w_subsample) / len(popu)
-            for ι_i in range(2):
-                # compute K_tilde and B
-                for i in range(2):
-
-                    # need to change 0.5 to model.hh.P_ι[ι_i]
-                    aggregates[i] += 0.5 * ζ_weight * \
-                        interp(w_vals, π_star[ι_i, ζ_i, :, i+1],
-                               w_subsample).mean()
+        for h_i in range(self.hh.π.size)
+            for ζ_i in range(len(ζ_vals)):
+                w_subsample = popu[popu[:, 1, h_i] == ζ_i, 0, h_i]
+                ζ_weight = len(w_subsample) / len(popu)
+                for ι_i in range(2):
+                    # compute K_tilde and B
+                    for i in range(2):
+                        aggregates[i] += self.hh.α[h_i] * self.hh.P_ι[ι_i] * ζ_weight * \
+                            interp(w_vals, π_star[ι_i, ζ_i, :, i+1],
+                                   w_subsample).mean()
 
         # K = K_tilde - B
         K = aggregates[0] - aggregates[1]
