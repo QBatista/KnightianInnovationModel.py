@@ -21,6 +21,7 @@ setup(name='knightian_model',
           'numba>=0.39',
           'numpy',
           'interpolation>=2.1.1',
-          'matplotlib'
+          'matplotlib',
+          'plotly'
           ]
       )
