@@ -3,6 +3,8 @@
 
 A package to solve the Knightian model of innovation.
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/QBatista/KnightianInnovationModel.py/master)
+
 ### Installation
 
 To install `knightian_model`, first download the source code, for example, by opening a terminal prompt and typing
